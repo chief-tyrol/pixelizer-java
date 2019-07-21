@@ -1,0 +1,1 @@
+app to convert an input image into a byte array for display on a pixel matric using an arduino

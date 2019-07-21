@@ -1,62 +1,61 @@
 package zone.gryphon.pixelizer;
 
-import lombok.extern.slf4j.Slf4j;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.image.Raster;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
- * @author galen
+ * @author tyrol
  */
-@Slf4j
 public class Pixelizer {
 
-    public static void main(String... args) throws Exception {
+    public static void main(String... args) {
         new Pixelizer(args).doMain();
     }
 
-    private final List<File> files;
+    @Option(name = "-h", aliases = {"--help"}, help = true)
+    private boolean help = false;
 
-    public Pixelizer(String...args) throws Exception {
-        if(args.length == 0) {
-            usage();
-            throw new RuntimeException("Will never reach this");
+    @Argument(metaVar = "file", usage = "Input image file to process. Must be exactly 8x8 pixels in size")
+    private List<File> files = new ArrayList<>();
+
+    public Pixelizer(String... args) {
+
+        CmdLineParser parser = new CmdLineParser(this);
+
+        try {
+            parser.parseArgument(args);
+        } catch (CmdLineException e) {
+            throw new RuntimeException("Invalid arguments", e);
         }
 
-        files = Collections.unmodifiableList(Arrays.stream(args)
-                .map(File::new)
-                .collect(Collectors.toList()));
+        if (args.length == 0 || help) {
+            System.err.print("Usage: pixelizer");
+            parser.printSingleLineUsage(System.err);
+            System.err.println();
+            parser.printUsage(System.err);
+            System.exit(1);
+        }
     }
 
-    private void usage() {
-        System.err.println("Usage: java -jar pixelizer inputFile [outputFile]");
-        System.exit(1);
-    }
-
-    public void doMain() throws Exception {
-        Thread.sleep(50);
+    private void doMain() {
         StringBuilder out = new StringBuilder();
-
 
         for (int i = 0; i < files.size(); i++) {
             out.append(String.format("// pic[%d] = \"%s\"\n", i, files.get(i).getAbsolutePath()));
         }
 
-        out.append(String.format("const unsigned char pic[%d][8][8][3] PROGMEM = {\n", files.size()));
+        out.append("\n");
 
+        out.append(String.format("const unsigned char pic[%d][8][8][3] PROGMEM = {\n", files.size()));
 
         for (int i = 0; i < files.size(); i++) {
             out.append(process(files.get(i)));
@@ -66,13 +65,9 @@ public class Pixelizer {
             }
 
             out.append('\n').append('\n');
-
         }
-        
-
 
         out.append("};\n");
-
 
         System.out.println(out.toString());
     }
@@ -95,10 +90,7 @@ public class Pixelizer {
             throw new IllegalArgumentException("Input image must be exactly 8x8 pixels (actual: " + w + "x" + h + ")");
         }
 
-        long pixels = w * h;
-
-
-        builder.append("    // ").append(file.getAbsolutePath()).append('\n');
+        builder.append("\n    // ").append(file.getAbsolutePath()).append('\n');
         for (int i = 0; i < w; i++) {
 
             builder.append("    ");
@@ -117,7 +109,7 @@ public class Pixelizer {
                 for (int channel = 0; channel < 3; channel++) {
                     rgb[channel] = raster.getSample(i, j, channel);
                 }
-                builder.append(String.format("{%3d,%3d,%3d}", rgb[2], rgb[1], rgb[0]));
+                builder.append(String.format("{%#2x,%#2x,%#2x}", rgb[2], rgb[1], rgb[0]));
 
                 if (j < h - 1) {
                     builder.append(", ");
@@ -133,6 +125,5 @@ public class Pixelizer {
         }
         return builder.toString();
     }
-
 
 }
